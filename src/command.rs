@@ -16,11 +16,13 @@ pub enum Language {
 
 // Construct a secure docker command
 //
-// Limits: (TODO)
-// -
-// -
-// -
-// -
+// Limits:
+//   - no capabilities
+//   - mem limit = 16 MB
+//   - mem + swap limit = 20 MB
+//   - pids limit = 256
+//   - net limit = none
+//
 pub fn base_command(tmp: &TempDir) -> Command {
     let mut path = tmp.path().as_os_str().to_os_string();
     path.push(":");
@@ -31,7 +33,12 @@ pub fn base_command(tmp: &TempDir) -> Command {
     cmd
         .arg("run")
         .arg("--rm")
-        .arg("--volume").arg(&path);
+        .arg("--volume").arg(&path)
+        .arg("--cap-drop=ALL")
+        .arg("--net=none")
+        //.arg("--memory=16m")
+        //.arg("--memory-swap=20m")
+        .arg("--pids-limit=256");
 
     cmd
 }

@@ -146,39 +146,18 @@ impl Sandbox {
 mod test {
     use super::*;
 
-    const TEST_C_CODE: &'static str = r#"
-    #include <stdio.h>
-    int main() {
-        printf("C test");
-        return 0;
-    }
-    "#;
-
-    const TEST_CPP_CODE: &'static str = r#"
-    #include <iostream>
-    int main() {
-        std::cout << "C++ test";
-        return 0;
-    }
-    "#;
-
-    const TEST_RUST_CODE: &'static str = r#"
-    fn main() {
-        print!("Rust test");
-    }
-    "#;
-
-    const TEST_GO_CODE: &'static str = r#"
-    package main
-    import "fmt"
-    func main() {
-        fmt.Print("Go test")
-    }
-    "#;
-
     #[test]
     fn compile_c_code() {
-        let c_output = Sandbox::new(TEST_C_CODE, Language::C)
+        let code = r#"
+        #include <stdio.h>
+
+        int main() {
+            printf("C test");
+            return 0;
+        }
+        "#;
+
+        let c_output = Sandbox::new(code, Language::C)
             .expect("Failed to construct sandbox")
             .output()
             .expect("Failed to execute");
@@ -188,7 +167,16 @@ mod test {
 
     #[test]
     fn compile_cpp_code() {
-        let cpp_output = Sandbox::new(TEST_CPP_CODE, Language::Cpp)
+        let code = r#"
+        #include <iostream>
+
+        int main() {
+            std::cout << "C++ test";
+            return 0;
+        }
+        "#;
+
+        let cpp_output = Sandbox::new(code, Language::Cpp)
             .expect("Failed to construct sandbox")
             .output()
             .expect("Failed to execute");
@@ -198,7 +186,13 @@ mod test {
 
     #[test]
     fn compile_rust_code() {
-        let rust_output = Sandbox::new(TEST_RUST_CODE, Language::Rust)
+        let code = r#"
+        fn main() {
+            print!("Rust test");
+        }
+        "#;
+
+        let rust_output = Sandbox::new(code, Language::Rust)
             .expect("Failed to construct sandbox")
             .output()
             .expect("Failed to execute");
@@ -208,11 +202,74 @@ mod test {
 
     #[test]
     fn compile_go_code() {
-        let go_output = Sandbox::new(TEST_GO_CODE, Language::Go)
+        let code = r#"
+        package main
+
+        import "fmt"
+
+        func main() {
+            fmt.Print("Go test")
+        }
+        "#;
+
+        let go_output = Sandbox::new(code, Language::Go)
             .expect("Failed to construct sandbox")
             .output()
             .expect("Failed to execute");
 
         assert_eq!(go_output.execute_output.stdout, "Go test");
+    }
+
+    #[test]
+    fn pid_limit() {
+        let code = r#"
+        #include <stdio.h>
+        #include <unistd.h>
+
+        int main() {
+            int pid;
+            for (int i = 0; i < 256; i++) {
+                pid = fork();
+                if (pid == -1) {
+                    printf("cannot fork");
+                }
+                if (pid == 0) {
+                    return 0;
+                }
+            }
+            return 0;
+        }
+        "#;
+
+        let output = Sandbox::new(code, Language::C)
+            .expect("Failed to construct sandbox")
+            .output()
+            .expect("Failed to execute");
+
+        assert!(output.execute_output.stdout.contains("cannot fork"));
+    }
+
+    #[test]
+    fn net_limit() {
+        let code = r#"
+        package main
+
+        import "fmt"
+        import "net/http"
+
+        func main() {
+            _, err := http.Get("http://example.com/")
+            if err != nil {
+                fmt.Print("cannot connect")
+            }
+        }
+        "#;
+
+        let output = Sandbox::new(code, Language::Go)
+            .expect("Failed to construct sandbox")
+            .output()
+            .expect("Failed to execute");
+
+        assert!(output.execute_output.stdout.contains("cannot connect"));
     }
 }
